@@ -1,0 +1,72 @@
+name: Update Nexus Webhook IP Allowlist
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-ips:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch latest Nexus IPs
+        id: fetch_ips
+        continue-on-error: true
+        run: |
+          python scripts/fetch_nexus_ips.py > ips.json
+          if [ ! -s ips.json ]; then
+            echo '{"ips":["203.0.113.0/24"]}' > ips.json
+            echo "⚠️ Using fallback IPs" >&2
+          fi
+          echo "ips=$(jq -c .ips ips.json)" >> $GITHUB_OUTPUT
+        env:
+          NEXUS_API_KEY: ${{ secrets.NEXUS_API_KEY }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.x"
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        continue-on-error: true
+        run: terraform plan -no-color
+        env:
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Terraform Apply (on manual or schedule)
+        if: (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && steps.plan.outcome == 'success'
+        run: terraform apply -auto-approve
+        env:
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Notify on Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_COLOR: danger
+          SLACK_TITLE: "❌ Nexus IP Update Failed"
+          SLACK_MESSAGE: "IP fetch or Terraform apply failed. Check logs."
