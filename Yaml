@@ -69,4 +69,89 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_COLOR: danger
           SLACK_TITLE: "❌ Nexus IP Update Failed"
-          SLACK_MESSAGE: "IP fetch or Terraform apply failed. Check logs."
+          SLACK_MESSAGE: "IP fetch or Terraform apply failed. Check logs."name: Update Nexus Webhook IP Allowlist
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-ips:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch latest Nexus IPs
+        id: fetch
+        continue-on-error: true
+        run: |
+          python scripts/fetch_nexus_ips.py > new_ips.json
+          if [ ! -s new_ips.json ]; then
+            echo '{"ips":["203.0.113.0/24"]}' > new_ips.json
+          fi
+          echo "new_ips=$(jq -c .ips new_ips.json)" >> $GITHUB_OUTPUT
+        env:
+          NEXUS_API_KEY: ${{ secrets.NEXUS_API_KEY }}
+
+      - name: Check for IP changes
+        id: changes
+        run: |
+          if [ -f current_ips.json ]; then
+            OLD_IPS=$(jq -c .ips current_ips.json)
+            NEW_IPS=${{ steps.fetch.outputs.new_ips }}
+            
+            if [ "$OLD_IPS" = "$NEW_IPS" ]; then
+              echo "changed=false" >> $GITHUB_OUTPUT
+              echo "✅ No IP changes detected"
+            else
+              echo "changed=true" >> $GITHUB_OUTPUT
+              echo "🔄 IP list updated: $NEW_IPS"
+              cp new_ips.json current_ips.json
+            fi
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            cp new_ips.json current_ips.json
+          fi
+
+      - name: Setup Terraform
+        if: steps.changes.outputs.changed == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.x"
+
+      - name: Terraform Init & Plan
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          terraform init
+          terraform plan
+        env:
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Terraform Apply
+        if: (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && steps.changes.outputs.changed == 'true'
+        run: terraform apply -auto-approve
+        env:
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Notify on Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_COLOR: danger
+          SLACK_TITLE: "Nexus IP Update Failed"
