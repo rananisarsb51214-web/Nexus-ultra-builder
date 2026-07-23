@@ -10,13 +10,12 @@ metadata: {
 default function
   children,
 
-  children: React.ReactNode;
-}>) {
-  return (
+  children
+
     <html lang="en">
       <body className="antialiased">
         {children}
-        <Analytics />
+        
       </body>
     </html>
   );
