@@ -1,0 +1,40 @@
+# AI Income Generator Skill
+
+**Version:** 2.0.0  
+**For:** Nexus Ultra Enterprise AI Workspace  
+
+## Overview
+End‑to‑end AI agent that takes users from idea to revenue using coding agents (Claude Code, GitHub Copilot), no‑code tools, and cloud deployment.
+
+## What It Does
+- 💡 Generates 3 tailored business ideas + validates demand with landing pages  
+- 🤖 Writes production‑ready code (FastAPI, React, Streamlit, etc.)  
+- 📦 Creates full GitHub repos with CI/CD, tests, and docs  
+- 📈 Builds Stripe/PayPal payment flows + monetization plans  
+- 🎯 Produces marketing copy, launch calendars, and freelance proposals  
+
+## Supported AI Providers
+OpenAI · Anthropic · Gemini · Grok · Mistral · Cohere · OpenRouter · Ollama
+
+## Quick Start
+1. This skill is now placed in `.nexus/skills/ai-income-generator/`
+2. In Nexus Ultra, trigger it with: *"I want to make money with AI"*
+3. Follow the 10‑step workflow – the agent will guide you through assessment, coding, deployment, and launch.
+
+## Outputs Delivered
+- `/src` – production code  
+- `/tests` – unit/integration tests  
+- `/docs` – README, API spec, deployment guide  
+- `/marketing` – blog posts, tweets, ad copy  
+- `monetization_plan.md` – pricing tiers, break‑even analysis  
+
+## Changelog
+**v2.0.0** (2026-07-24)  
+- Multi‑agent collaboration  
+- Stripe revenue tracking  
+- Compliance & testing modules  
+- Market‑validation loop  
+
+---
+
+*Part of the Nexus Ultra Enterprise AI Workspace.*
